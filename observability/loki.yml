@@ -1,0 +1,83 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  destination:
+    namespace: observability
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 6.41.1
+    chart: loki
+    helm:
+      values: |-
+        loki:
+          auth_enabled: false
+          schemaConfig:
+            configs:
+              - from: 2024-04-01
+                store: tsdb
+                object_store: s3
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+          storage:
+            type: s3
+            bucketNames:
+              chunks: loki
+              ruler: loki
+              admin: loki
+            s3:
+              endpoint: http://10.0.0.18:9000
+              secretAccessKey: eppTSZ4zQxaPNp3gJtl1QGuuM4uTe9H2e7E066Zd
+              accessKeyId: 0TirWEVTqf8FXgNrMNSU
+              s3ForcePathStyle: true
+              insecure: true
+            object_store:
+              type: s3
+              s3:
+                endpoint: http://10.0.0.18:9000
+                secretAccessKey: eppTSZ4zQxaPNp3gJtl1QGuuM4uTe9H2e7E066Zd
+                accessKeyId: 0TirWEVTqf8FXgNrMNSU
+                s3ForcePathStyle: true
+                insecure: true
+        lokiCanary:
+          nodeSelector:
+            role: worker
+        backend:
+          nodeSelector: 
+            role: worker
+          persistence:
+            storageClass: nfs-csi
+        write:
+          nodeSelector:
+            role: worker
+          persistence:
+            storageClass: nfs-csi
+            enableStatefulSetAutoDeletePVC: true
+        read:
+          nodeSelector:
+            role: worker
+        resultsCache:
+          nodeSelector:
+            role: worker
+        gateway:
+          nodeSelector: 
+            role: worker
+        nginxConfig:
+          resolver: "coredns.kube-system.svc.cluster.local"
+        chunksCache:
+          nodeSelector:
+            role: worker
+          allocatedMemory: 512
+  sources: []
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

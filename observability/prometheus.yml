@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+spec:
+  destination:
+    namespace: observability
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 27.39.0
+    chart: prometheus
+    helm:
+      values: |-
+        server:
+          nodeSelector:
+            role: worker
+        global:
+          scrape_interval: 15s
+          scrape_timeout: 10s
+          evaluation_interval: 15s
+        persistentVolume:
+          existingClaim: prometheus-pvc
+        alertmanager:
+          persistence:
+            storageClass: nfs-csi
+  sources: []
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

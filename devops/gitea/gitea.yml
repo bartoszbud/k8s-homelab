@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: gitea-pv
+spec:
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: 10Gi
+  nfs:
+    path: /nfs-storage/gitea/
+    server: nfs.lab.pl
+    readOnly: false
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+spec:
+  destination:
+    namespace: devops
+    server: https://kubernetes.default.svc
+  source:
+    path: ''
+    repoURL: https://dl.gitea.io/charts
+    targetRevision: 11.0.1
+    chart: gitea
+    helm:
+      parameters:
+      - name: image.rootless
+        value: 'false'
+      - name: postgresql-ha.enabled
+        value: 'false'
+      - name: postgresql.enabled
+        value: 'false'
+      - name: redis-cluster.enabled
+        value: 'false'
+      values: |-
+        service:
+          http:
+            clusterIP:
+        persistence:
+          enabled: true
+          volumeName: gitea-pv
+          size: 10Gi
+          accessModes:
+            - ReadWriteOnce
+          storageClass: nfs-csi
+        ingress:
+          enabled: true
+          className: nginx
+          hosts:
+            - host: git.lab.pl
+              paths:
+                - path: /
+                  pathType: Prefix
+        gitea:
+          admin:
+            username: admin
+            email: gitea_admin@lab.pl
+            passwordMode: initialOnlyRequireReset
+          config:
+            APP_NAME: HomeLab Gitea
+            server:
+              ROOT_URL: https://git.lab.pl
+            database:
+              DB_TYPE: postgres
+              HOST: 10.0.0.28
+              NAME: git      
+              USER: git
+              PASSWD: gitea123
+  sources: []
+  project: default
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
